@@ -6,24 +6,28 @@ HOST = "localhost"
 PORT = 12345
 buffer_size = 1024
 numConn = 4
-def start_game(client_socket, difficulty):
+
+# Variable global para almacenar el estado del juego
+game_state = None
+game_lock = threading.Lock()
+
+def build_board(difficulty):
     if difficulty == "1":
         words = ['gato', 'perro', 'oso', 'conejo']
         board_size = 8
-        client_socket.send("Modo: Principiante".encode())
+        modo = 'Principiante'
     elif difficulty == "2":
-        words = ['gato', 'perro', 'oso', 'conejo','pez','lobo','jirafa','canario','iguana']
+        words = ['gato', 'perro', 'oso', 'conejo', 'pez', 'lobo', 'jirafa', 'canario', 'iguana']
         board_size = 18
-        client_socket.send('Modo: Avanzado'.encode())
+        modo = 'Avanzado'
     else:
-        client_socket.send('Opción inválida'.encode())
         return None
 
     board = random.sample(words * 2, board_size)
     random.shuffle(board)
     flipped = ['X'] * board_size
     print(board)
-    return board, flipped, board_size
+    return board, flipped, board_size, modo
 
 def play_game(client_socket, board, flipped, board_size):
     attempts = 0
@@ -43,7 +47,7 @@ def play_game(client_socket, board, flipped, board_size):
             flipped[choice] = board[choice]
             carta = board[choice]
             if attempts == 2:
-                client_socket.send(str(carta).encode())
+                client_socket.send(str('Carta Volteada: '+carta).encode())
                 if board[choice] == board[last_choice]:
                     client_socket.send(str('\n¡Felicidades! Ha formado una pareja').encode())
                     flipped[last_choice] = board[last_choice]
@@ -58,65 +62,53 @@ def play_game(client_socket, board, flipped, board_size):
                     flipped[choice] = 'X'
                     attempts = 0
             elif attempts == 1:
-                print(carta)
-                client_socket.sendall(str(carta).encode())
+                client_socket.sendall(str('Carta Volteada: '+carta).encode())
                 client_socket.sendall(str('Siguiente tiro').encode())
                 last_choice = choice
                 carta_previa = carta
-
 def run_game(client_socket):
-    client_socket.send(str("Dificultad: 1)Principiante 2)Avanzado \n Ingrese numero:").encode())
-    difficulty = client_socket.recv(buffer_size).decode().strip()
-    game = start_game(client_socket, difficulty)
-    print("Antes de la funcion game")
+    global game_state
+    game = game_state
     if game is not None:
-        board, flipped, board_size = game
-        print("listo para jugar")
+        board, flipped, board_size, modo = game
+        print("Listo para jugar")
+        client_socket.send(str(modo).encode())
         play_game(client_socket, board, flipped, board_size)
     else:
-        print(game)
-        print("Algo malo paso")
-    # Cerrar la conexión con el cliente
+        print("Algo salió mal")
     client_socket.close()
 
 def servirPorSiempre(socketTcp, listaconexiones):
+    global game_state
     try:
         while True:
-            client_conn, client_addr = socketTcp.accept()
+            client_socket, client_addr = socketTcp.accept()
             print(f"Se ha establecido una conexión desde {client_addr[0]}:{client_addr[1]}")
-            listaconexiones.append(client_conn)
-            thread_read = threading.Thread(target=recibir_datos, args=[client_conn, client_addr])
-            thread_read.start()
-            gestion_conexiones(listaConexiones)
+            client_socket.send(str("Dificultad: 1)Principiante 2)Avanzado \nIngrese número:").encode())
+            difficulty = client_socket.recv(buffer_size).decode().strip()
+            with game_lock:
+                if game_state is None:
+                    game_state = build_board(difficulty)
+                listaconexiones.append(client_socket)
+                thread_read = threading.Thread(target=run_game, args=[client_socket])
+                thread_read.start()
     except Exception as e:
-        print("error en servir")
+        print("Error en servir")
         print(e)
 
 def gestion_conexiones(listaconexiones):
     for conn in listaconexiones:
         if conn.fileno() == -1:
             listaconexiones.remove(conn)
-    print("hilos activos:", threading.active_count())
-    print("enum", threading.enumerate())
-    print("conexiones: ", len(listaconexiones))
+    print("Hilos activos:", threading.active_count())
+    print("Enumeración:", threading.enumerate())
+    print("Conexiones:", len(listaconexiones))
     print(listaconexiones)
 
-def recibir_datos(conn, addr):
-    cur_thread = threading.current_thread()
-    print("Recibiendo datos del cliente {} en el {}".format(addr, cur_thread.name))
-    try:
-        run_game(conn)
-    except Exception as e:
-        print("error en recibir")
-        print(e)
-    finally:
-        conn.close()
-
-listaConexiones = []
+listaconexiones = []
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as TCPServerSocket:
     TCPServerSocket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     TCPServerSocket.bind((HOST, PORT))
     TCPServerSocket.listen(int(numConn))
     print("El servidor TCP está disponible y en espera de solicitudes")
-
-    servirPorSiempre(TCPServerSocket, listaConexiones)
+    servirPorSiempre(TCPServerSocket, listaconexiones)
