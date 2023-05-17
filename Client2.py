@@ -1,6 +1,4 @@
-#!/usr/bin/env python3
 import socket
-import os
 HOST = "localhost"  # Nombre del host o direccion ip
 #HOST = "192.168.254.223"  # Nombre del host o direccion ip
 PORT = 12345  # Puerto usado por el servidor
@@ -14,13 +12,6 @@ cliente = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # Conectar el socket a un servidor remoto en el puerto 5000
 cliente.connect((HOST, PORT))
 print('Se ha establecido una conexión con el servidor remoto.')
-
-#Selecciona Dificultad del juego
-respuesta = cliente.recv(buffer_size).decode()
-print(respuesta)
-# Envia dificultad
-eleccion = str(input())
-cliente.send(eleccion.encode())
 
 #Recibe modo de dificultad
 respuesta = cliente.recv(buffer_size).decode()
@@ -39,7 +30,8 @@ while True:
     cliente.send(str(seleccion).encode())
 
     carta_volteada = cliente.recv(buffer_size).decode()
-    print(f"Cartas volteadas:{carta_volteada}")
+    #Carta volteada
+    print(carta_volteada)
 
     # Recibir la respuesta del servidor
     respuesta = cliente.recv(buffer_size).decode()
