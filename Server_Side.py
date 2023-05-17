@@ -12,16 +12,16 @@ lock = threading.Lock()  # Bloqueo para sincronizar los movimientos de los clien
 board = None  # Tablero compartido entre los clientes
 
 def build_board(difficulty):
-    if difficulty == "1":
+    if difficulty == 1:
         words = ['gato', 'perro', 'oso', 'conejo']
         board_size = 8
-    elif difficulty == "2":
+    elif difficulty == 2:
         words = ['gato', 'perro', 'oso', 'conejo', 'pez', 'lobo', 'jirafa', 'canario', 'iguana']
         board_size = 18
     else:
         return 'Opción inválida', None, None
 
-    return f"Modo: {'Principiante' if difficulty == '1' else 'Avanzado'}", random.sample(words * 2, board_size), ['X'] * board_size
+    return f"Modo: {'Principiante' if difficulty == 1 else 'Avanzado'}", random.sample(words * 2, board_size), ['X'] * board_size
 
 def play_game(client_socket, flipped, board_size):
     global board
@@ -64,14 +64,13 @@ def play_game(client_socket, flipped, board_size):
                     last_choice = choice
                     carta_previa = carta
 
-def run_game(client_socket):
-    global game_state
+def run_game(client_socket,game_state):
     global board
-    client_socket.send(str("Dificultad: 1)Principiante 2)Avanzado \n Ingrese numero:").encode())
+    """client_socket.send(str("Dificultad: 1)Principiante 2)Avanzado \n Ingrese numero:").encode())
     difficulty = client_socket.recv(buffer_size).decode().strip()
     with lock:
         if game_state is None:
-            game_state = build_board(difficulty)
+            game_state = build_board(difficulty)"""
     message, game_board, flipped_cards = game_state
     print(game_board)
     if game_board is None:
@@ -87,12 +86,16 @@ def run_game(client_socket):
     client_socket.close()
 
 def servirPorSiempre(socketTcp, listaconexiones):
+    global game_state
+    difficulty = int(input("\nDificultad: 1)Principiante 2)Avanzado \n Ingrese numero:\n"))
     try:
         while True:
             client_conn, client_addr = socketTcp.accept()
             print("Conexión establecida con", client_addr)
             listaconexiones.append(client_conn)
-            threading.Thread(target=run_game, args=(client_conn,)).start()
+            if game_state is None:
+               game_state = build_board(difficulty)
+            threading.Thread(target=run_game, args=(client_conn,game_state)).start()
             gestion_conexiones(listaconexiones)
     finally:
         for conn in listaconexiones:
